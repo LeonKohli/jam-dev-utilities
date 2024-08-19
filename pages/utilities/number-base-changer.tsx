@@ -11,7 +11,7 @@ import CallToActionGrid from "@/components/CallToActionGrid";
 import Meta from "@/components/Meta";
 import { Combobox } from "@/components/ds/ComboboxComponent";
 
-export default function Base64Encoder() {
+export default function NumberBaseChanger() {
   const [fromBase, setFromBase] = useState(10);
   const [toBase, setToBase] = useState(2);
   const [input, setInput] = useState("");
@@ -21,13 +21,17 @@ export default function Base64Encoder() {
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLTextAreaElement>) => {
       const { value } = event.currentTarget;
-      setInput(value);
+      setInput(value.trim());
     },
     []
   );
 
   useEffect(() => {
-    setOutput(convertBase(input, fromBase, toBase));
+    try {
+      setOutput(convertBase(input, fromBase, toBase));
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Invalid input");
+    }
   }, [input, fromBase, toBase]);
 
   return (
@@ -90,34 +94,51 @@ export default function Base64Encoder() {
   );
 }
 
-const convertBase = (num: string, fromBase: number, toBase: number) => {
-  if (!num) {
-    return "";
+const convertBase = (num: string, fromBase: number, toBase: number): string => {
+  if (!num) return "";
+
+  // Handle hexadecimal input (both uppercase and lowercase)
+  const normalizedNum = fromBase === 16 ? num.toLowerCase() : num;
+
+  // Split the number into integer and fractional parts
+  const [intPart, fracPart = ""] = normalizedNum.split(".");
+
+  // Convert integer part
+  const intValue = parseInt(intPart, fromBase);
+  if (isNaN(intValue)) throw new Error("Invalid integer part");
+  let result = intValue.toString(toBase);
+
+  // Convert fractional part if it exists
+  if (fracPart) {
+    let fracValue = 0;
+    let divisor = fromBase;
+    for (const digit of fracPart) {
+      const digitValue = parseInt(digit, fromBase);
+      if (isNaN(digitValue) || digitValue >= fromBase) {
+        throw new Error("Invalid fractional part");
+      }
+      fracValue += digitValue / divisor;
+      divisor *= fromBase;
+    }
+
+    if (fracValue > 0) {
+      result += ".";
+      for (let i = 0; i < 8; i++) { // Limit to 8 decimal places
+        fracValue *= toBase;
+        const digit = Math.floor(fracValue);
+        result += digit.toString(toBase);
+        fracValue -= digit;
+        if (fracValue === 0) break;
+      }
+    }
   }
 
-  const parsedNum = parseInt(num, fromBase);
-  if (isNaN(parsedNum)) {
-    return "Invalid number";
-  }
-
-  return parsedNum.toString(toBase);
+  return result;
 };
 
 const data = [
-  {
-    value: "2",
-    label: "Binary (2)",
-  },
-  {
-    value: "8",
-    label: "Octal (8)",
-  },
-  {
-    value: "10",
-    label: "Decimal (10)",
-  },
-  {
-    value: "16",
-    label: "Hexadecimal (16)",
-  },
+  { value: "2", label: "Binary (2)" },
+  { value: "8", label: "Octal (8)" },
+  { value: "10", label: "Decimal (10)" },
+  { value: "16", label: "Hexadecimal (16)" },
 ];
